@@ -501,11 +501,17 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
   async function save() {
     setSaving(true)
     try {
+      const triggerConfig = { ...state.trigger_config }
+      if (state.trigger_type === "keyword_match") {
+        triggerConfig.match_type = (triggerConfig.match_type as string) || "contains"
+        triggerConfig.keywords = triggerConfig.keywords || []
+      }
+
       const payload = {
         name: state.name || "Untitled automation",
         description: state.description || null,
         trigger_type: state.trigger_type,
-        trigger_config: state.trigger_config,
+        trigger_config: triggerConfig,
         is_active: state.is_active,
         steps: toApiSteps(state.steps),
       }
@@ -593,7 +599,25 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
             <TriggerCard
               type={state.trigger_type}
               config={state.trigger_config}
-              onTypeChange={(t) => patchTop("trigger_type", t)}
+              onTypeChange={(t) => {
+                patchTop("trigger_type", t)
+                if (t === "keyword_match") {
+                  patchTop("trigger_config", {
+                    keywords: state.trigger_config?.keywords ?? [],
+                    match_type: (state.trigger_config?.match_type as "exact" | "contains") ?? "contains",
+                  })
+                } else if (t === "time_based") {
+                  patchTop("trigger_config", {
+                    schedule: (state.trigger_config?.schedule as string) ?? "",
+                  })
+                } else if (t === "tag_added") {
+                  patchTop("trigger_config", {
+                    tag_id: (state.trigger_config?.tag_id as string) ?? "",
+                  })
+                } else {
+                  patchTop("trigger_config", {})
+                }
+              }}
               onConfigChange={(c) => patchTop("trigger_config", c)}
             />
             <StepList
@@ -729,7 +753,11 @@ function KeywordMatchConfig({
       .map((s) => s.trim())
       .filter(Boolean)
     setDraft(parsed.join(", "))
-    onChange({ ...config, keywords: parsed })
+    onChange({
+      ...config,
+      match_type: config?.match_type ?? "contains",
+      keywords: parsed,
+    })
   }
 
   return (
